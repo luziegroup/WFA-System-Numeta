@@ -2084,7 +2084,7 @@ function buildHRD(id) {
         '<button class="btn btn-ghost btn-sm card-action" onclick="exportLaporan()"><i class="ti ti-download"></i>Export CSV</button>' +
       '</div>' +
       '<div style="overflow-x:auto"><table class="data-table" style="min-width:600px"><thead><tr>' +
-        '<th>Nama</th><th>' + (isHRD?'Divisi':'Nama') + '</th><th>Hadir</th><th>Terlambat</th><th>Tdk Lengkap</th><th>Avg Skor</th><th>Status</th>' +
+        '<th>Nama</th><th>' + (isHRD?'Divisi':'Koordinator') + '</th><th>Hadir</th><th>Terlambat</th><th>Tdk Lengkap</th><th>Avg Skor</th><th>Status</th>' +
       '</tr></thead><tbody>' +
       empStats.map(function(s) {
         var e = s.emp;
@@ -2480,7 +2480,7 @@ function buildKARY(id) {
   var siangDone = !!attend.siang;
   var pagiTime  = attend.pagi || '--:--';
   var siangTime = attend.siang || '--:--';
-  var myEmp  = DB.employees.find(function(e){ return e.email===currentUser.email; }) || {};
+  var myEmp  = DB.employees.find(function(e){ return (e.email||'').toLowerCase()===currentUser.email.toLowerCase(); }) || {};
 
   if (id === 'beranda') {
     var jam = new Date().getHours();
@@ -2489,11 +2489,21 @@ function buildKARY(id) {
       '<div class="hero-card">' +
         '<div class="hero-name">Selamat ' + sapa + ', ' + currentUser.name.split(' ')[0] + '! 👋</div>' +
         '<div class="hero-role">Karyawan · ' + (myEmp.div||'') + ' · Koordinator: ' + (myEmp.koor||'') + '</div>' +
-        '<div class="hero-stats">' +
-          '<div class="hero-stat"><div class="hs-val">21</div><div class="hs-lbl">Hari Hadir</div></div>' +
-          '<div class="hero-stat"><div class="hs-val">' + (myEmp.pelanggaran||0) + '</div><div class="hs-lbl">Pelanggaran</div></div>' +
-          '<div class="hero-stat"><div class="hs-val">' + (myEmp.skor||'—') + '</div><div class="hs-lbl">Avg Skor</div></div>' +
-        '</div>' +
+        (function(){
+          var encEm2 = currentUser.email.toLowerCase().replace(/[.#$\[\]]/g,'_');
+          var thisMonth2 = new Date().toISOString().slice(0,7);
+          var hariHadir = Object.keys(DB.attendance).filter(function(k){
+            if (!k.startsWith(encEm2+'_')) return false;
+            if (k.indexOf(thisMonth2)<0) return false;
+            var r = DB.attendance[k];
+            return r.pagi && r.siang;
+          }).length;
+          return '<div class="hero-stats">' +
+            '<div class="hero-stat"><div class="hs-val">' + hariHadir + '</div><div class="hs-lbl">Hari Hadir</div></div>' +
+            '<div class="hero-stat"><div class="hs-val">' + (myEmp.pelanggaran||0) + '</div><div class="hs-lbl">Pelanggaran</div></div>' +
+            '<div class="hero-stat"><div class="hs-val">' + (myEmp.skor||'—') + '</div><div class="hs-lbl">Avg Skor</div></div>' +
+          '</div>';
+        })() +
       '</div>' +
       '<div class="card"><div class="card-head"><i class="ti ti-timeline"></i><h2>Alur Harian WFA</h2></div>' +
         '<div class="timeline">' +
@@ -2739,7 +2749,7 @@ function buildKARY(id) {
 
   if (id === 'riwayat') {
     // attendKey encode email, jadi kita cari dengan encoded key
-    var encEmail = currentUser.email.replace(/[.#$\[\]]/g,'_');
+    var encEmail = currentUser.email.toLowerCase().replace(/[.#$\[\]]/g,'_');
     var allKeys  = Object.keys(DB.attendance).filter(function(k){
       return k.startsWith(encEmail + '_');
     }).sort().reverse();
@@ -4377,7 +4387,7 @@ function exportCSVTemplate() {
   var csv = '\uFEFF' +
     'nama,email,password,divisi,koordinator,role\r\n' +
     'Budi Santoso,,pass1234,Marketing,' + koor1 + ',kary\r\n' +
-    'Siti Rahayu,,123,,,kary\r\n' +
+    'Siti Rahayu,,123456,,,kary\r\n' +
     'Ahmad Fauzi,,,,,kary';
   var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   var url  = URL.createObjectURL(blob);
