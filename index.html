@@ -671,6 +671,24 @@ function todayKey() { return new Date().toISOString().split('T')[0]; }
 function attendKey(email) { return (email||'').toLowerCase().replace(/[.#$\[\]]/g,'_') + '_' + todayKey(); }
 function attendKeyFor(email, dateKey) { return (email||'').toLowerCase().replace(/[.#$\[\]]/g,'_') + '_' + dateKey; }
 
+// Ambil data absensi karyawan untuk HARI INI dari DB.attendance (bukan dari e.pagi/e.siang yang mungkin data kemarin)
+function getEmpToday(e) {
+  var rec = DB.attendance[attendKey(e.email)] || {};
+  var status = e.status;
+  // Jika field pagi di attendance hari ini kosong, berarti belum absen hari ini
+  if (!rec.pagi) {
+    status = (e.status === 'cabut') ? 'cabut' : 'belum';
+  } else {
+    status = rec.status || (rec.pagi ? 'hadir' : 'belum');
+  }
+  return {
+    pagi:   rec.pagi   || '--',
+    siang:  rec.siang  || '--',
+    status: status,
+    skor:   rec.skorHarian || null
+  };
+}
+
 // Cari email karyawan dari attendance key (key = sanitizedEmail_YYYY-MM-DD)
 function emailFromAttendKey(aKey) {
   // BUGFIX: bandingkan dengan lowercase email agar konsisten dengan attendKey()
@@ -1634,10 +1652,12 @@ function buildSkorTrendChart(emails, numDays, threshold) {
 // ---- HRD ----
 function buildHRD(id) {
   var emps = DB.employees;
-  var hadir    = emps.filter(function(e){ return e.status==='hadir'; }).length;
-  var terlambat= emps.filter(function(e){ return e.status==='terlambat'; }).length;
-  var belum    = emps.filter(function(e){ return e.status==='belum'; }).length;
-  var cabut    = emps.filter(function(e){ return e.status==='cabut'; }).length;
+  // Selalu baca status dari DB.attendance hari ini, bukan dari e.status yang tersimpan permanen
+  var empsToday = emps.map(function(e) { return Object.assign({}, e, getEmpToday(e)); });
+  var hadir    = empsToday.filter(function(e){ return e.status==='hadir'; }).length;
+  var terlambat= empsToday.filter(function(e){ return e.status==='terlambat'; }).length;
+  var belum    = empsToday.filter(function(e){ return e.status==='belum'; }).length;
+  var cabut    = empsToday.filter(function(e){ return e.status==='cabut'; }).length;
 
   if (id === 'dashboard') return (
     '<div class="page-header"><h1>Dashboard HRD ' + rtBadge() + '</h1><p>Ringkasan kondisi WFA hari ini — ' + new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</p></div>' +
@@ -1648,7 +1668,7 @@ function buildHRD(id) {
       '<div class="metric-box"><div class="mb-label">Belum Absen</div><div class="mb-val" style="color:var(--red)">' + belum + '</div><div class="mb-sub">Perlu follow up</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-head"><i class="ti ti-users"></i><h2>Status Absensi Karyawan</h2></div>' +
-    emps.map(function(e) {
+    empsToday.map(function(e) {
       return '<div class="trow">' +
         '<div class="av" style="background:' + e.bg + ';color:#fff">' + e.inits + '</div>' +
         '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--gray-800)">' + e.name + '</div>' +
@@ -2190,9 +2210,11 @@ function buildHRD(id) {
 // ---- KOORDINATOR ----
 function buildKOOR(id) {
   var timku = DB.employees.filter(function(e){ return e.koor===currentUser.name; });
-  var hadir    = timku.filter(function(e){ return e.status==='hadir'; }).length;
-  var terlambat= timku.filter(function(e){ return e.status==='terlambat'; }).length;
-  var belum    = timku.filter(function(e){ return e.status==='belum'||e.status==='cabut'; }).length;
+  // Selalu baca dari attendance hari ini
+  var timkuToday = timku.map(function(e){ return Object.assign({}, e, getEmpToday(e)); });
+  var hadir    = timkuToday.filter(function(e){ return e.status==='hadir'; }).length;
+  var terlambat= timkuToday.filter(function(e){ return e.status==='terlambat'; }).length;
+  var belum    = timkuToday.filter(function(e){ return e.status==='belum'||e.status==='cabut'; }).length;
 
   if (id === 'dashboard') {
     if (!timku.length) {
@@ -2214,7 +2236,7 @@ function buildKOOR(id) {
       '<div class="metric-box"><div class="mb-label">Belum/Cabut</div><div class="mb-val" style="color:var(--red)">' + belum + '</div></div>' +
     '</div>' +
     '<div class="card"><div class="card-head"><i class="ti ti-clipboard-check"></i><h2>Status Tim Hari Ini</h2></div>' +
-    timku.map(function(e) {
+    timkuToday.map(function(e) {
       var ring = e.skor ? '<div class="score-ring ' + (e.skor>=80?'good':'warn') + '" style="margin-right:10px">' + e.skor + '</div>' : '<div class="score-ring" style="margin-right:10px;border-color:var(--gray-200);color:var(--gray-400)">—</div>';
       return '<div class="trow">' +
         '<div class="av" style="background:' + e.bg + ';color:#fff">' + e.inits + '</div>' +
@@ -2223,7 +2245,7 @@ function buildKOOR(id) {
         ring + statusBadge(e.status) + '</div>';
     }).join('') + '</div>' +
     '<div class="card"><div class="card-head"><i class="ti ti-device-laptop" style="color:var(--green)"></i><h2>Status Hubstaff Tim</h2></div>' +
-    timku.map(function(e) {
+    timkuToday.map(function(e) {
       var on = e.status!=='cabut'&&e.status!=='belum';
       return '<div class="hubs-bar">' +
         '<div class="hubs-dot ' + (on?'hubs-active':'hubs-off') + '"></div>' +
