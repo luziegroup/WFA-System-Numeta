@@ -491,6 +491,56 @@ function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
 }
 
+// ==================== ANTRIAN TULIS YANG BELUM TERKONFIRMASI ====================
+// MASALAH YANG DIPERBAIKI: sebelumnya, kalau dbSavePath() gagal terkirim ke server
+// (mis. koneksi putus saat karyawan absen), datanya HANYA ada di layar & localStorage.
+// Begitu listener Firebase di bawah menerima data terbaru dari server (yang tidak
+// punya perubahan tadi), baris "DB = val" menimpa total DB lokal — perubahan yang
+// belum terkirim itu HILANG, padahal user sudah diberi tahu "muat ulang untuk coba
+// lagi" — reload justru membuang datanya, bukan mengirim ulang.
+//
+// Sekarang setiap dbSavePath() dicatat ke antrian ini (disimpan juga ke localStorage
+// agar selamat walau tab ditutup/refresh sebelum sempat terkirim). Antrian ini
+// dicoba dikirim ulang otomatis saat: (1) koneksi Firebase kembali online, dan
+// (2) setiap kali snapshot baru diterima dari server. Item baru dibuang dari
+// antrian hanya setelah benar-benar berhasil tersimpan di server.
+var PENDING_WRITES_KEY = 'wfa_pending_writes_v1';
+function loadPendingWrites() {
+  try { return JSON.parse(localStorage.getItem(PENDING_WRITES_KEY) || '{}'); } catch(e) { return {}; }
+}
+function savePendingWritesToLocal() {
+  try { localStorage.setItem(PENDING_WRITES_KEY, JSON.stringify(pendingWrites)); } catch(e) {}
+}
+var pendingWrites = loadPendingWrites();
+
+// Timpakan path yang masih tertunda ke atas object DB (dot-path sederhana, mis. "attendance/abc_2026-07-02")
+function applyPendingWritesTo(dbObj) {
+  Object.keys(pendingWrites).forEach(function(path) {
+    var parts = path.split('/');
+    var cur = dbObj;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+      cur = cur[parts[i]];
+    }
+    cur[parts[parts.length - 1]] = pendingWrites[path];
+  });
+}
+
+// Coba kirim ulang satu path yang masih tertunda
+function retryPendingWrite(path) {
+  if (!(path in pendingWrites)) return;
+  fbRef('db/' + path).set(pendingWrites[path]).then(function() {
+    delete pendingWrites[path];
+    savePendingWritesToLocal();
+  }).catch(function(e) {
+    console.warn('Retry pending write gagal untuk path', path, e);
+  });
+}
+
+function flushPendingWrites() {
+  Object.keys(pendingWrites).forEach(retryPendingWrite);
+}
+
 // ---- Firebase helpers ----
 function fbRef(path) { return rtdb.ref('luzie/' + path); }
 function emailToKey(email) { return (email||'').replace(/\./g,'_').replace(/#/g,'_').replace(/\$/g,'_').replace(/\[/g,'_').replace(/\]/g,'_'); }
@@ -503,6 +553,8 @@ rtdb.ref('.info/connected').on('value', function(snap) {
   var lbl = document.getElementById('fb-lbl');
   if (dot) dot.style.background = fbOnline ? 'var(--green)' : 'var(--amber)';
   if (lbl) lbl.textContent = fbOnline ? 'Online' : 'Offline';
+  // Begitu koneksi kembali online, coba kirim ulang semua tulisan yang tertunda.
+  if (fbOnline) flushPendingWrites();
 });
 
 // Bersihkan object dari nilai undefined sebelum kirim ke Firebase
@@ -531,9 +583,19 @@ function dbSave(data) {
 // Simpan hanya satu sub-path ke Firebase (lebih efisien)
 // BUGFIX: sekarang mengembalikan Promise, agar pemanggil bisa kasih feedback jujur ke user
 // (sebelumnya gagal kirim hanya tercatat di console, user tidak pernah tahu datanya belum tersimpan)
+// BUGFIX #2: sekarang juga dicatat ke antrian pendingWrites, agar kalau gagal
+// terkirim (atau tab keburu ditutup/refresh), datanya TIDAK hilang dan akan
+// otomatis dicoba kirim ulang — bukan sekadar tercatat di console lalu lenyap.
 function dbSavePath(path, value) {
   try {
-    var p = fbRef('db/' + path).set(cleanForFirebase(value));
+    var cleaned = cleanForFirebase(value);
+    pendingWrites[path] = cleaned;
+    savePendingWritesToLocal();
+    var p = fbRef('db/' + path).set(cleaned);
+    p.then(function() {
+      delete pendingWrites[path];
+      savePendingWritesToLocal();
+    });
     p.catch(function(e){ console.warn('Firebase path save error:', e); });
     return p;
   } catch(e) {
@@ -587,8 +649,14 @@ fbRef('db').on('value', function(snap) {
     if (DB.settings.minSkorRataRata === undefined) DB.settings.minSkorRataRata = 70;
     if (DB.settings.hariEvaluasiCabut === undefined) DB.settings.hariEvaluasiCabut = 5;
     if (!Array.isArray(DB.settings.divisiList) || !DB.settings.divisiList.length) DB.settings.divisiList = DEFAULT_DIVISI_LIST.slice();
+    // BUGFIX: sebelum data dari server ini dianggap final, timpakan dulu tulisan
+    // yang masih tertunda (belum terkonfirmasi sukses) di atasnya — supaya absen/
+    // to-do yang belum sempat terkirim tidak hilang hanya karena snapshot baru
+    // datang atau halaman di-refresh, lalu coba kirim ulang.
+    applyPendingWritesTo(DB);
     dbSaveLocal(DB);
     if (currentUser) refreshCurrentPage();
+    flushPendingWrites();
   } else {
     // Belum ada data di Firebase → push data lokal
     fbRef('db').set(cleanForFirebase(DB)).catch(function(){});
@@ -1474,6 +1542,21 @@ function showPage(role, id) {
   saveSession(); // BUGFIX: simpan posisi terakhir, agar refresh halaman tidak kembali ke login
 }
 
+// PENJAGA UMUM: jika user sedang fokus mengetik di input/textarea/select MANAPUN
+// di halaman yang sedang aktif, tunda refresh (jangan timpa isian yang belum
+// disimpan). Refresh yang tertunda otomatis dijalankan begitu user selesai
+// mengetik (blur/pindah fokus) — lihat listener 'focusout' di bawah.
+// Ini TIDAK mengubah logika halaman todo karyawan yang sudah ada; hanya
+// menambah perlindungan yang sama untuk halaman-halaman lain.
+var pendingPageRefresh = false;
+function isTypingInsidePage(pg) {
+  var ae = document.activeElement;
+  if (!ae || !pg) return false;
+  var tag = ae.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;
+  return pg.contains(ae);
+}
+
 function refreshCurrentPage() {
   if (currentRole && currentPageId) {
     var pg = document.getElementById('pg-' + currentPageId);
@@ -1485,11 +1568,37 @@ function refreshCurrentPage() {
         refreshTodoBannerOnly();
         return;
       }
+      // Penjagaan umum untuk halaman-halaman lain: kalau user sedang mengetik
+      // di form manapun di halaman ini, tunda dulu refresh-nya.
+      if (isTypingInsidePage(pg)) {
+        pendingPageRefresh = true;
+        return;
+      }
       pg.innerHTML = buildPage(currentRole, currentPageId);
       onPageShow(currentRole, currentPageId);
     }
   }
 }
+
+// Jalankan refresh yang tertunda begitu user selesai mengetik (pindah fokus
+// keluar dari input/textarea/select). Dipasang di tahap capture supaya
+// tertangkap sebelum elemen terkait mungkin sudah berubah.
+document.addEventListener('focusout', function(e) {
+  if (!pendingPageRefresh) return;
+  var tag = e.target && e.target.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+  pendingPageRefresh = false;
+  // Beri jeda singkat agar fokus baru (kalau user pindah ke field lain) sempat
+  // ter-set dulu, supaya tidak salah anggap "sudah selesai mengetik".
+  setTimeout(function() {
+    if (!isTypingInsidePage(document.getElementById('pg-' + currentPageId))) {
+      refreshCurrentPage();
+    } else {
+      // User masih mengetik di field lain pada halaman yang sama → tunda lagi.
+      pendingPageRefresh = true;
+    }
+  }, 150);
+}, true);
 
 // Refresh hanya status absen di banner todo (tidak menyentuh form/input karyawan)
 function refreshTodoBannerOnly() {
@@ -2481,6 +2590,112 @@ function buildHRD(id) {
 }
 
 // ---- KOORDINATOR ----
+// Render satu baris kartu arsip to-do untuk satu tanggal — dipindah ke scope
+// global (sebelumnya terkurung di dalam closure buildKOOR) supaya bisa dipanggil
+// ulang oleh arsipPilihTgl() saat tombol tanggal diklik. Isi logikanya SAMA PERSIS,
+// hanya targetEmps sekarang jadi parameter, bukan diambil dari closure.
+function renderArsipTglRow(tgl, targetEmps) {
+  var rows = targetEmps.map(function(emp) {
+    var encEm = emp.email.replace(/[.#$\[\]]/g,'_');
+    var key   = encEm + '_' + tgl;
+    var todos = (DB.todos[key]||[]).filter(function(t){ return t.task&&t.task.trim(); });
+    var rec   = DB.attendance[key] || {};
+    var doneTodos = todos.filter(function(t){ var s=t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score; return s!==null&&s!==undefined; });
+    var avgS  = doneTodos.length ? Math.round(doneTodos.reduce(function(a,t){ var s=t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score; return a+(s||0); },0)/doneTodos.length) : null;
+    var statusC = todos.length===0?'var(--gray-300)':doneTodos.length===todos.length?'var(--green)':'var(--amber)';
+    var avgColor = avgS>=80?'var(--green)':avgS>=60?'var(--amber)':avgS?'var(--red)':'var(--gray-400)';
+
+    return '<div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px;background:var(--white)">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--gray-100)">' +
+        '<div class="av" style="background:' + emp.bg + ';color:#fff;width:34px;height:34px;font-size:11px;flex-shrink:0">' + emp.inits + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + emp.name + '</div>' +
+          '<div style="font-size:10px;color:var(--gray-400);margin-top:2px">' +
+            'Absen: <strong>' + (rec.pagi||'—') + '</strong> → <strong>' + (rec.siang||'—') + '</strong>' +
+            (rec.status ? ' &nbsp;·&nbsp; <span style="color:' + (rec.status==='hadir'?'var(--green)':rec.status==='terlambat'?'var(--amber)':'var(--gray-400)') + '">' + (rec.status==='hadir'?'Tepat waktu':rec.status==='terlambat'?'Terlambat':'—') + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        (avgS !== null
+          ? '<div style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:2.5px solid ' + avgColor + ';font-weight:800;font-size:13px;color:' + avgColor + ';flex-shrink:0">' + avgS + '</div>'
+          : '<div style="width:38px;height:38px;border-radius:50%;border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);flex-shrink:0">—</div>') +
+      '</div>' +
+      (todos.length === 0
+        ? '<div style="text-align:center;padding:12px 0;color:var(--gray-300);font-size:12px"><i class="ti ti-clipboard-x" style="font-size:18px;display:block;margin-bottom:4px"></i>Tidak ada to-do</div>'
+        : '<div style="display:flex;flex-direction:column;gap:5px">' +
+          todos.map(function(t, ti){
+            var s = t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score;
+            var hasS = s!==null&&s!==undefined;
+            var sc = hasS?(s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)'):'var(--gray-300)';
+            var isKoreksi = t.koreksi_skor!==null&&t.koreksi_skor!==undefined;
+            return '<div style="padding:7px 9px;background:var(--gray-50);border-radius:8px;border-left:3px solid ' + (hasS?sc:'var(--gray-200)') + '">' +
+              '<div style="display:flex;align-items:center;gap:7px">' +
+                '<span style="font-size:10px;font-weight:700;color:var(--gray-400);min-width:16px">' + (ti+1) + '.</span>' +
+                '<div style="flex:1;font-size:12px;color:var(--gray-800);font-weight:500">' + t.task + '</div>' +
+                (hasS
+                  ? '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
+                      (t.score!==null&&t.score!==undefined && isKoreksi
+                        ? '<span style="font-size:10px;color:var(--gray-400);text-decoration:line-through">' + t.score + '</span><span style="font-size:10px;color:var(--amber)">→</span>'
+                        : '') +
+                      '<span style="font-weight:800;font-size:13px;color:' + sc + '">' + s + '</span>' +
+                      (isKoreksi ? '<i class="ti ti-pencil" style="font-size:10px;color:var(--amber)" title="Dikoreksi koordinator"></i>' : '') +
+                    '</div>'
+                  : '<span style="font-size:11px;color:var(--gray-300);flex-shrink:0">Blm dinilai</span>') +
+              '</div>' +
+              (t.komentar_koor
+                ? '<div style="margin-top:5px;padding:5px 8px;background:var(--blue-50);border-radius:5px;font-size:11px;color:var(--blue-800);display:flex;align-items:flex-start;gap:5px">' +
+                    '<i class="ti ti-message-circle" style="font-size:12px;flex-shrink:0;margin-top:1px"></i>' +
+                    '<span>' + t.komentar_koor + '</span>' +
+                  '</div>'
+                : '') +
+            '</div>';
+          }).join('') +
+        '</div>') +
+      (todos.length > 0
+        ? '<div style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray-400)">' +
+            '<span>' + doneTodos.length + '/' + todos.length + ' tugas dinilai</span>' +
+            (doneTodos.length === todos.length
+              ? '<span style="color:var(--green);display:flex;align-items:center;gap:2px"><i class="ti ti-circle-check"></i> Lengkap</span>'
+              : '<span style="color:var(--amber)">· ' + (todos.length-doneTodos.length) + ' belum</span>') +
+          '</div>'
+        : '') +
+    '</div>';
+  }).join('');
+  return rows;
+}
+
+// BUGFIX: fungsi ini dipanggil oleh tombol tanggal arsip (onclick="arsipPilihTgl(...)")
+// tapi SEBELUMNYA TIDAK PERNAH DIDEFINISIKAN — itu sebabnya tombolnya tidak bisa
+// diklik sama sekali (klik memicu error "arsipPilihTgl is not defined" yang gagal
+// diam-diam, tidak terlihat oleh user). Sekarang didefinisikan di scope global agar
+// bisa dipanggil dari onclick di HTML manapun.
+function arsipPilihTgl(tgl) {
+  var timku = DB.employees.filter(function(e){ return e.koor === currentUser.name; });
+  var grid  = document.getElementById('arsip-grid');
+  var label = document.getElementById('arsip-tgl-label');
+  if (!grid) return; // halaman sudah berpindah sebelum tombol sempat diproses
+
+  grid.innerHTML = renderArsipTglRow(tgl, timku);
+
+  if (label) {
+    var d = new Date(tgl);
+    var h = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()];
+    var b = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][d.getMonth()];
+    label.textContent = h + ', ' + d.getDate() + ' ' + b + ' ' + d.getFullYear();
+  }
+
+  // Perbarui gaya tombol chip agar yang aktif terlihat biru, sisanya normal —
+  // meniru gaya isActive yang sama seperti saat tombol pertama kali dibuat.
+  var chipsWrap = document.getElementById('arsip-tgl-chips');
+  if (chipsWrap) {
+    Array.prototype.forEach.call(chipsWrap.querySelectorAll('button[id^="chip-"]'), function(btn){
+      var isActive = btn.id === ('chip-' + tgl);
+      btn.style.borderColor = isActive ? 'var(--blue-500)' : 'var(--gray-200)';
+      btn.style.background  = isActive ? 'var(--blue-600)' : 'var(--white)';
+      btn.style.color       = isActive ? '#fff' : 'var(--gray-600)';
+    });
+  }
+}
+
 function buildKOOR(id) {
   var timku = DB.employees.filter(function(e){ return e.koor===currentUser.name; });
   var today = todayKey();
@@ -2992,74 +3207,7 @@ function buildKOOR(id) {
           }).join('');
 
           // Render to-do untuk tanggal yang dipilih (default: tanggal paling baru)
-          function renderArsipTgl(tgl) {
-            var rows = targetEmps.map(function(emp) {
-              var encEm = emp.email.replace(/[.#$\[\]]/g,'_');
-              var key   = encEm + '_' + tgl;
-              var todos = (DB.todos[key]||[]).filter(function(t){ return t.task&&t.task.trim(); });
-              var rec   = DB.attendance[key] || {};
-              var doneTodos = todos.filter(function(t){ var s=t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score; return s!==null&&s!==undefined; });
-              var avgS  = doneTodos.length ? Math.round(doneTodos.reduce(function(a,t){ var s=t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score; return a+(s||0); },0)/doneTodos.length) : null;
-              var statusC = todos.length===0?'var(--gray-300)':doneTodos.length===todos.length?'var(--green)':'var(--amber)';
-              var avgColor = avgS>=80?'var(--green)':avgS>=60?'var(--amber)':avgS?'var(--red)':'var(--gray-400)';
-
-              return '<div style="border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px;background:var(--white)">' +
-                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--gray-100)">' +
-                  '<div class="av" style="background:' + emp.bg + ';color:#fff;width:34px;height:34px;font-size:11px;flex-shrink:0">' + emp.inits + '</div>' +
-                  '<div style="flex:1;min-width:0">' +
-                    '<div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + emp.name + '</div>' +
-                    '<div style="font-size:10px;color:var(--gray-400);margin-top:2px">' +
-                      'Absen: <strong>' + (rec.pagi||'—') + '</strong> → <strong>' + (rec.siang||'—') + '</strong>' +
-                      (rec.status ? ' &nbsp;·&nbsp; <span style="color:' + (rec.status==='hadir'?'var(--green)':rec.status==='terlambat'?'var(--amber)':'var(--gray-400)') + '">' + (rec.status==='hadir'?'Tepat waktu':rec.status==='terlambat'?'Terlambat':'—') + '</span>' : '') +
-                    '</div>' +
-                  '</div>' +
-                  (avgS !== null
-                    ? '<div style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:2.5px solid ' + avgColor + ';font-weight:800;font-size:13px;color:' + avgColor + ';flex-shrink:0">' + avgS + '</div>'
-                    : '<div style="width:38px;height:38px;border-radius:50%;border:2px solid var(--gray-200);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray-300);flex-shrink:0">—</div>') +
-                '</div>' +
-                (todos.length === 0
-                  ? '<div style="text-align:center;padding:12px 0;color:var(--gray-300);font-size:12px"><i class="ti ti-clipboard-x" style="font-size:18px;display:block;margin-bottom:4px"></i>Tidak ada to-do</div>'
-                  : '<div style="display:flex;flex-direction:column;gap:5px">' +
-                    todos.map(function(t, ti){
-                      var s = t.koreksi_skor!==null&&t.koreksi_skor!==undefined?t.koreksi_skor:t.score;
-                      var hasS = s!==null&&s!==undefined;
-                      var sc = hasS?(s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)'):'var(--gray-300)';
-                      var isKoreksi = t.koreksi_skor!==null&&t.koreksi_skor!==undefined;
-                      return '<div style="padding:7px 9px;background:var(--gray-50);border-radius:8px;border-left:3px solid ' + (hasS?sc:'var(--gray-200)') + '">' +
-                        '<div style="display:flex;align-items:center;gap:7px">' +
-                          '<span style="font-size:10px;font-weight:700;color:var(--gray-400);min-width:16px">' + (ti+1) + '.</span>' +
-                          '<div style="flex:1;font-size:12px;color:var(--gray-800);font-weight:500">' + t.task + '</div>' +
-                          (hasS
-                            ? '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
-                                (t.score!==null&&t.score!==undefined && isKoreksi
-                                  ? '<span style="font-size:10px;color:var(--gray-400);text-decoration:line-through">' + t.score + '</span><span style="font-size:10px;color:var(--amber)">→</span>'
-                                  : '') +
-                                '<span style="font-weight:800;font-size:13px;color:' + sc + '">' + s + '</span>' +
-                                (isKoreksi ? '<i class="ti ti-pencil" style="font-size:10px;color:var(--amber)" title="Dikoreksi koordinator"></i>' : '') +
-                              '</div>'
-                            : '<span style="font-size:11px;color:var(--gray-300);flex-shrink:0">Blm dinilai</span>') +
-                        '</div>' +
-                        (t.komentar_koor
-                          ? '<div style="margin-top:5px;padding:5px 8px;background:var(--blue-50);border-radius:5px;font-size:11px;color:var(--blue-800);display:flex;align-items:flex-start;gap:5px">' +
-                              '<i class="ti ti-message-circle" style="font-size:12px;flex-shrink:0;margin-top:1px"></i>' +
-                              '<span>' + t.komentar_koor + '</span>' +
-                            '</div>'
-                          : '') +
-                      '</div>';
-                    }).join('') +
-                  '</div>') +
-                (todos.length > 0
-                  ? '<div style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray-400)">' +
-                      '<span>' + doneTodos.length + '/' + todos.length + ' tugas dinilai</span>' +
-                      (doneTodos.length === todos.length
-                        ? '<span style="color:var(--green);display:flex;align-items:center;gap:2px"><i class="ti ti-circle-check"></i> Lengkap</span>'
-                        : '<span style="color:var(--amber)">· ' + (todos.length-doneTodos.length) + ' belum</span>') +
-                    '</div>'
-                  : '') +
-              '</div>';
-            }).join('');
-            return rows;
-          }
+          function renderArsipTgl(tgl) { return renderArsipTglRow(tgl, targetEmps); }
 
           var defaultTgl = sortedDates[0];
           var defaultContent = renderArsipTgl(defaultTgl);
@@ -3938,9 +4086,12 @@ function karyAbsenPagi() {
   dbSaveLocal(DB);
   var p1 = dbSavePath('attendance/' + aKey, cleanForFirebase(DB.attendance[aKey]));
   if (bc) bc.postMessage({ type:'update', data: DB });
-  // BUGFIX: kasih tahu karyawan secara jujur kalau absennya GAGAL terkirim ke server
+  // BUGFIX: kasih tahu karyawan secara jujur kalau absennya GAGAL terkirim ke server.
+  // BUGFIX #2: dulu pesan ini menyuruh "muat ulang halaman" untuk coba lagi — padahal
+  // reload justru MENGHAPUS data yang belum terkirim. Sekarang sistem mencoba kirim
+  // ulang otomatis di latar belakang, jadi user cukup diminta menunggu/tetap online.
   p1.catch(function(){
-    showToast('⚠️ Absen pagi tersimpan di perangkat ini, tapi GAGAL terkirim ke server. Periksa koneksi internet Anda, lalu muat ulang halaman ini agar dicoba kirim lagi.', 'error');
+    showToast('⚠️ Absen pagi tersimpan di perangkat ini, sempat gagal terkirim ke server. Sistem akan mencoba mengirim ulang otomatis — tetap buka halaman ini & pastikan internet menyala, JANGAN muat ulang sebelum status berubah "Tersimpan".', 'error');
   });
 
   // Tampilkan modal sukses → arahkan ke to-do list
@@ -3964,7 +4115,7 @@ function karyAbsenSiang() {
   var p1 = dbSavePath('attendance/' + aKey, cleanForFirebase(DB.attendance[aKey]));
   if (bc) bc.postMessage({ type:'update', data: DB });
   p1.catch(function(){
-    showToast('⚠️ Absen siang tersimpan di perangkat ini, tapi GAGAL terkirim ke server. Periksa koneksi internet Anda, lalu muat ulang halaman ini agar dicoba kirim lagi.', 'error');
+    showToast('⚠️ Absen siang tersimpan di perangkat ini, sempat gagal terkirim ke server. Sistem akan mencoba mengirim ulang otomatis — tetap buka halaman ini & pastikan internet menyala, JANGAN muat ulang sebelum status berubah "Tersimpan".', 'error');
   });
 
   showAbsenSuksesModal(ts, false, 'siang');
