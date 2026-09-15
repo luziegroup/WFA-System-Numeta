@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WFA System — Luzie Group</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<link rel="stylesheet" href="css/style.css"/>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="js/00-firebase-config.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-top">
+    <div class="login-logo"><i class="ti ti-home-check" style="font-size:20px;color:var(--blue-700)"></i></div>
+    <div class="login-brand">WFA System <span>Luzie Group</span></div>
+  </div>
+  <div class="login-hero">
+    <div class="login-box">
+      <div style="font-size:28px;font-weight:800;color:var(--blue-900);letter-spacing:-1px;margin-bottom:4px">Selamat Datang</div>
+      <div style="font-size:13px;color:var(--gray-400);margin-bottom:22px">Masuk ke portal Work From Anywhere Anda</div>
+
+      <!-- LANGKAH 1: Pilih Role -->
+      <div id="login-step-1">
+        <div style="font-size:12px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Pilih Mode Masuk</div>
+        <div class="role-cards" id="role-cards">
+          <div class="role-card" onclick="loginPilihRole('hrd', this)">
+            <i class="ti ti-building-bank"></i>
+            <div class="rc-name">HRD</div>
+            <div class="rc-email">Admin</div>
+          </div>
+          <div class="role-card" onclick="loginPilihRole('koor', this)">
+            <i class="ti ti-user-star"></i>
+            <div class="rc-name">Koordinator</div>
+            <div class="rc-email">Supervisor</div>
+          </div>
+          <div class="role-card" onclick="loginPilihRole('kary', this)">
+            <i class="ti ti-user"></i>
+            <div class="rc-name">Karyawan</div>
+            <div class="rc-email">Staff</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LANGKAH 2: Pilih Nama -->
+      <div id="login-step-2" style="display:none">
+        <button onclick="loginBackToRole()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--blue-600);font-size:12px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px"><i class="ti ti-arrow-left"></i>Ganti role</button>
+        <div style="font-size:12px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Pilih Nama Anda</div>
+        <div style="position:relative;margin-bottom:10px">
+          <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:15px"></i>
+          <input type="text" id="login-nama-search" placeholder="Cari nama..." oninput="filterLoginNamaList()" style="width:100%;padding:9px 12px 9px 36px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:13px;font-family:var(--font)"/>
+        </div>
+        <div id="login-nama-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding-right:2px"></div>
+        <div id="l-err-nama" style="font-size:12px;color:var(--red);margin-top:8px;display:none;align-items:center;gap:5px"><i class="ti ti-alert-circle"></i> Tidak ada akun untuk role ini</div>
+        <div id="l-err-search" style="font-size:12px;color:var(--gray-400);margin-top:8px;display:none;align-items:center;gap:5px;justify-content:center;padding:12px 0"><i class="ti ti-search-off"></i> Tidak ada nama yang cocok</div>
+      </div>
+
+      <!-- LANGKAH 3: Input Password -->
+      <div id="login-step-3" style="display:none">
+        <button onclick="loginBackToNama()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--blue-600);font-size:12px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px"><i class="ti ti-arrow-left"></i>Ganti nama</button>
+        <!-- Profil yang dipilih -->
+        <div id="login-selected-user" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--blue-50);border:1.5px solid var(--blue-200);border-radius:var(--radius-lg);margin-bottom:18px"></div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Password</label>
+          <div style="position:relative">
+            <input type="password" id="l-pass" placeholder="••••••••" style="padding-right:40px"
+              onkeydown="if(event.key==='Enter')doLogin()"/>
+            <button type="button" onclick="togglePassVis()" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--gray-400);padding:4px;display:flex;align-items:center">
+              <i class="ti ti-eye" id="pass-eye" style="font-size:16px"></i>
+            </button>
+          </div>
+        </div>
+        <div class="err-msg" id="l-err" style="margin-bottom:10px"><i class="ti ti-alert-circle"></i> Password salah</div>
+        <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Masuk ke Sistem</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-page" style="display:none">
+  <!-- Desktop TopNav -->
+  <nav class="topnav">
+    <div class="topnav-brand">
+      <div class="topnav-logo"><i class="ti ti-home-check"></i></div>
+      <div><div class="topnav-name">WFA System</div><div class="topnav-sub">Luzie Group</div></div>
+    </div>
+    <div class="topnav-clock" id="topnav-clock">--:--:--</div>
+    <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);border-radius:99px;padding:4px 10px;margin-left:10px">
+      <div id="fb-dot" style="width:7px;height:7px;border-radius:50%;background:var(--amber);transition:background .3s"></div>
+      <span id="fb-lbl" style="font-size:10px;font-weight:600;color:rgba(255,255,255,.8)">Connecting...</span>
+    </div>
+    <div class="user-pill" style="margin-left:16px">
+      <div class="user-av" id="top-av"></div>
+      <div class="user-info"><div class="un" id="top-uname"></div><div class="ur" id="top-urole"></div></div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()" style="margin-left:10px"><i class="ti ti-logout" style="font-size:14px"></i> Keluar</button>
+  </nav>
+
+  <!-- Mobile Header -->
+  <div class="mobile-header" id="mobile-header">
+    <div class="mh-brand">
+      <div class="mh-logo"><i class="ti ti-home-check" style="font-size:16px;color:var(--blue-700)"></i></div>
+      <div><div class="mh-name">WFA System</div><div class="mh-sub">Luzie Group</div></div>
+    </div>
+    <div class="mh-right">
+      <div class="mh-clock" id="mob-clock">--:--</div>
+      <div class="mh-av" id="mob-av"></div>
+      <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;padding:6px 8px;cursor:pointer;display:flex;align-items:center"><i class="ti ti-logout" style="font-size:15px"></i></button>
+    </div>
+  </div>
+
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main-content" id="main-content"></main>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="bottom-nav-inner" id="bottom-nav-inner"></div>
+  </nav>
+</div>
+
+<div id="toast"></div>
+
+<!-- ====================================================================
+     JS di-load berurutan sesuai urutan eksekusi program asli.
+     JANGAN ubah urutan file di bawah ini -- banyak fungsi saling
+     bergantung secara global (bukan module), jadi urutan load penting.
+     ==================================================================== -->
+<script src="js/01-data-store.js"></script>
+<script src="js/02-scoring-engine.js"></script>
+<script src="js/03-ui-common.js"></script>
+<script src="js/04-auth-login.js"></script>
+<script src="js/05-portal-router.js"></script>
+<script src="js/06-page-hrd.js"></script>
+<script src="js/07-page-koor.js"></script>
+<script src="js/08-page-kary.js"></script>
+<script src="js/09-rekap-laporan.js"></script>
+<script src="js/10-absensi-gps.js"></script>
+<script src="js/11-todo-features.js"></script>
+<script src="js/12-komentar-komunikasi.js"></script>
+<script src="js/13-hrd-karyawan-actions.js"></script>
+<script src="js/14-pengaturan-bobot-divisi.js"></script>
+<script src="js/15-arsip-zoom-meeting.js"></script>
+<script src="js/16-manajemen-akun.js"></script>
+<script src="js/17-filter-select-hapus.js"></script>
+<script src="js/18-reset-export-karyawan.js"></script>
+<script src="js/19-export-import-akun.js"></script>
+<script src="js/20-edit-kehadiran.js"></script>
+<script src="js/21-init.js"></script>
+</body>
+</html>
