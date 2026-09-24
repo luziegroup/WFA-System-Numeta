@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "luzie-react": {
+      ".read": true,
+      ".write": true,
+      "users": {
+        "$id": {
+          ".validate": "newData.hasChildren(['name', 'email', 'role']) && newData.child('role').isString() && (newData.child('role').val() === 'karyawan' || newData.child('role').val() === 'leader' || newData.child('role').val() === 'hrd')"
+        }
+      },
+      "entries": {
+        "$id": {
+          ".validate": "newData.hasChildren(['userId', 'date'])"
+        }
+      }
+    },
+
+    "luzie": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
