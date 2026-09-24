@@ -38,11 +38,16 @@ const AVATAR_PRESETS = [
 ];
 
 export const AkunSayaView: React.FC<AkunSayaViewProps> = ({ onOpenSwitchAccount }) => {
-  const { currentUser, updateUser, showToast, verifyCurrentPassword, mustChangePassword, isDefaultPasswordValue } = useApp();
+  const { currentUser, updateUser, showToast, verifyCurrentPassword } = useApp();
 
   // State Profil Umum
-  const [phoneNumber, setPhoneNumber] = useState('+62 812-3456-7890');
-  const [wfaAddress, setWfaAddress] = useState(currentUser.wfaAddress || 'Jakarta Selatan, DKI Jakarta');
+  // PENTING: dulu field ini default ke data contoh ("+62 812-3456-7890" / "Jakarta Selatan,
+  // DKI Jakarta") dan dipakai apa adanya kalau karyawan tidak sengaja mengubahnya — bahkan
+  // ikut disimpan sebagai fallback saat submit. Sekarang keduanya diambil dari data akun asli
+  // masing-masing karyawan (kosong kalau memang belum pernah diisi), supaya tidak ada lagi
+  // data template yang salah tertera untuk karyawan di kota/nomor mana pun.
+  const [phoneNumber, setPhoneNumber] = useState(currentUser.phone || '');
+  const [wfaAddress, setWfaAddress] = useState(currentUser.wfaAddress || '');
   
   // State Ganti Foto Profil
   const [avatarPreview, setAvatarPreview] = useState(currentUser.avatar);
@@ -110,8 +115,13 @@ export const AkunSayaView: React.FC<AkunSayaViewProps> = ({ onOpenSwitchAccount 
   // Handle Simpan Profil & Lokasi WFA
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!wfaAddress.trim()) {
+      showToast('Isi Alamat/Lokasi WFA Anda yang sebenarnya terlebih dahulu', 'warning');
+      return;
+    }
     updateUser(currentUser.id, {
-      wfaAddress: wfaAddress.trim() || 'Jakarta Selatan, DKI Jakarta'
+      phone: phoneNumber.trim(),
+      wfaAddress: wfaAddress.trim(),
     });
     showToast('Informasi profil dan lokasi WFA berhasil disimpan!', 'success');
   };
@@ -154,11 +164,6 @@ export const AkunSayaView: React.FC<AkunSayaViewProps> = ({ onOpenSwitchAccount 
 
     if (newPasswordInput.length < 6) {
       setPasswordError('Password baru minimal harus 6 karakter');
-      return;
-    }
-
-    if (isDefaultPasswordValue(newPasswordInput)) {
-      setPasswordError('Password baru tidak boleh sama dengan password default/bawaan sistem (mis. "123456"). Gunakan password lain yang lebih aman.');
       return;
     }
 
@@ -301,17 +306,6 @@ export const AkunSayaView: React.FC<AkunSayaViewProps> = ({ onOpenSwitchAccount 
                 <p className="text-xs text-slate-500">Perbarui kata sandi login sistem presensi WFA Anda secara berkala</p>
               </div>
             </div>
-
-            {mustChangePassword && (
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                <span>
-                  <strong>Password akun Anda masih memakai password bawaan/default.</strong> Demi keamanan data
-                  Anda, segera ganti dengan password baru yang hanya Anda ketahui — jangan gunakan password bawaan
-                  ini lagi.
-                </span>
-              </div>
-            )}
 
             {passwordError && (
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
