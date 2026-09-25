@@ -79,6 +79,7 @@ interface AppContextType {
   toggleTodoCentang: (todoId: string) => void; // FITUR UTAMA: Ubah penilaian menjadi CENTANG
   updateTodoProof: (todoId: string, proofLink?: string, proofImage?: string, proofFileName?: string) => void;
   doAbsenSiang: (location: string, notes: string) => void;
+  updateHubstaffSeconds: (seconds: number) => void;
 
   // Aksi Leader
   leaderReviewEntry: (entryId: string, leaderScore: number, communicationScore: number, generalComment: string, verifiedItemIds: string[]) => void;
@@ -135,6 +136,7 @@ const normalizeEntry = (raw: any): DailyWfaEntry => ({
   leaderReviewedAt: raw.leaderReviewedAt ?? null,
   leaderReviewedBy: raw.leaderReviewedBy ?? null,
   status: raw.status ?? 'belum_mulai',
+  hubstaffSeconds: raw.hubstaffSeconds ?? 0,
 });
 
 const normalizeWarning = (raw: any): WarningItem => raw as WarningItem;
@@ -789,6 +791,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Absen Siang berhasil dicatat! Menunggu verifikasi Leader.', 'success');
   };
 
+  // 6b. Simpan total detik time-tracking Hubstaff hari ini ke entry (tersinkron ke semua perangkat,
+  // otomatis "reset" tiap hari karena entry-nya sendiri per-tanggal, bukan field global).
+  const updateHubstaffSeconds = (seconds: number) => {
+    setEntries((prev) => {
+      const idx = prev.findIndex((e) => e.userId === currentUser.id && e.date === selectedDate);
+      if (idx < 0) return prev;
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], hubstaffSeconds: seconds };
+      return updated;
+    });
+  };
+
   // 7. Aksi Leader: Memberi nilai berdasarkan to-do yang dicentang + nilai komunikasi (wajib) + komen general
   const leaderReviewEntry = (
     entryId: string,
@@ -1029,6 +1043,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTodoCentang,
         updateTodoProof,
         doAbsenSiang,
+        updateHubstaffSeconds,
         leaderReviewEntry,
         sendWarning,
         deleteWarning,
