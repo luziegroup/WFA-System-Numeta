@@ -83,6 +83,9 @@ export interface DailyWfaEntry {
   leaderReviewedAt: string | null;
   leaderReviewedBy: string | null;
   status: 'belum_mulai' | 'pagi_selesai' | 'siang_selesai' | 'selesai_direview';
+  // Total detik time-tracking Hubstaff yang tercatat pada hari ini (direset otomatis
+  // tiap entry baru dibuat untuk tanggal berikutnya, karena entry sendiri per-tanggal).
+  hubstaffSeconds?: number;
 }
 
 export interface WarningItem {
