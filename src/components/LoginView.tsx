@@ -32,11 +32,22 @@ export const LoginView: React.FC = () => {
     [allUsers]
   );
 
-  // Filter sesuai yang diketik: cocokkan dari awal kata (prefix match), tidak peka huruf besar/kecil
+  // Filter sesuai yang diketik: cocokkan huruf di MANA SAJA dalam username (bukan cuma
+  // awalannya), tidak peka huruf besar/kecil. Contoh: ketik "gesang" -> ikut muncul
+  // "koor_gesang" dan "gesang" (sama-sama MENGANDUNG "gesang"). Makin spesifik yang
+  // diketik (mis. "koor_g"), makin sedikit & makin akurat yang cocok.
+  // Urutan: yang cocok di AWAL kata ditaruh duluan, baru yang cocoknya di tengah/akhir.
   const filteredUsernames = useMemo(() => {
     const query = username.trim().toLowerCase();
     if (!query) return allUsernames;
-    return allUsernames.filter((u) => u.startsWith(query));
+    return allUsernames
+      .filter((u) => u.includes(query))
+      .sort((a, b) => {
+        const aStarts = a.startsWith(query) ? 0 : 1;
+        const bStarts = b.startsWith(query) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        return a.localeCompare(b);
+      });
   }, [allUsernames, username]);
 
   useEffect(() => {
@@ -52,6 +63,21 @@ export const LoginView: React.FC = () => {
   const pickSuggestion = (value: string) => {
     setUsername(value);
     setShowSuggestions(false);
+  };
+
+  // Tebalkan bagian username yang cocok dengan ketikan, biar kelihatan jelas kenapa dia muncul
+  const highlightMatch = (text: string, query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return <span>{text}</span>;
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return <span>{text}</span>;
+    return (
+      <span>
+        {text.slice(0, idx)}
+        <span className="font-bold text-[#004080]">{text.slice(idx, idx + q.length)}</span>
+        {text.slice(idx + q.length)}
+      </span>
+    );
   };
 
   // Hitung mundur kunci sementara setelah terlalu banyak salah password
@@ -169,7 +195,7 @@ export const LoginView: React.FC = () => {
                         }`}
                       >
                         <UserIcon className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                        <span>{uname}</span>
+                        <span>{highlightMatch(uname, username)}</span>
                       </li>
                     ))}
                   </ul>
