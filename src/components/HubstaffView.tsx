@@ -25,22 +25,39 @@ interface HubstaffViewProps {
 }
 
 export const HubstaffView: React.FC<HubstaffViewProps> = ({ onNavigate }) => {
-  const { currentUser, getCurrentEntry, doAbsenPagi, showToast } = useApp();
+  const { currentUser, getCurrentEntry, doAbsenPagi, updateHubstaffSeconds, showToast } = useApp();
   const entry = getCurrentEntry();
 
   // Status kelengkapan persiapan kerja
   const isAbsenPagiDone = !!entry.absenPagi;
+  const isAbsenSiangDone = !!entry.absenSiang;
   const isTodoListDone = entry.todos.length > 0;
   const isReadyForHubstaff = isAbsenPagiDone && isTodoListDone;
 
-  // State simulasi tracking Hubstaff lokal jika diaktifkan
+  // Sumber kebenaran total waktu tracking adalah entry.hubstaffSeconds di Firebase (per akun,
+  // per TANGGAL — jadi otomatis "reset" tiap hari karena entry-nya sendiri per-tanggal, dan
+  // otomatis TERSINKRON ke semua perangkat sehingga bisa dilihat lagi lewat Riwayat Absen).
   const [isTracking, setIsTracking] = useState(false);
-  const [trackedSeconds, setTrackedSeconds] = useState(7420); // Demo default ~2 jam 3 menit
+  const [trackedSeconds, setTrackedSeconds] = useState(entry.hubstaffSeconds || 0);
   const [showLaunchModal, setShowLaunchModal] = useState<string | null>(null);
 
-  // Timer interval saat tracking aktif
+  const trackedSecondsRef = React.useRef(trackedSeconds);
+  trackedSecondsRef.current = trackedSeconds;
+  const entryIdRef = React.useRef(entry.id);
+  const prevAbsenSiangRef = React.useRef(isAbsenSiangDone);
+
+  // Kalau entry berganti (hari baru / user lain), muat ulang total tersimpan & hentikan timer.
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    if (entryIdRef.current !== entry.id) {
+      entryIdRef.current = entry.id;
+      setTrackedSeconds(entry.hubstaffSeconds || 0);
+      setIsTracking(false);
+    }
+  }, [entry.id, entry.hubstaffSeconds]);
+
+  // Detak per detik saat tracking aktif
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isTracking) {
       interval = setInterval(() => {
         setTrackedSeconds((prev) => prev + 1);
@@ -50,6 +67,37 @@ export const HubstaffView: React.FC<HubstaffViewProps> = ({ onNavigate }) => {
       if (interval) clearInterval(interval);
     };
   }, [isTracking]);
+
+  // Sinkron berkala ke Firebase (tiap 10 detik) selagi tracking aktif, supaya progress
+  // tidak hilang kalau tab tertutup mendadak & supaya bisa terlihat real-time di Riwayat Absen.
+  useEffect(() => {
+    if (!isTracking) return;
+    const syncInterval = setInterval(() => {
+      updateHubstaffSeconds(trackedSecondsRef.current);
+    }, 10000);
+    return () => clearInterval(syncInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTracking]);
+
+  // OTOMATIS BERHENTI begitu Absen Siang baru saja tercatat (karyawan dianggap selesai
+  // sesi kerja WFA hari itu) — sekaligus simpan total akhirnya ke Firebase.
+  useEffect(() => {
+    if (!prevAbsenSiangRef.current && isAbsenSiangDone && isTracking) {
+      setIsTracking(false);
+      updateHubstaffSeconds(trackedSecondsRef.current);
+      showToast('Absen siang tercatat — timer Hubstaff otomatis dihentikan.', 'info');
+    }
+    prevAbsenSiangRef.current = isAbsenSiangDone;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAbsenSiangDone]);
+
+  // Simpan progress terakhir saat halaman ditinggalkan (best-effort)
+  useEffect(() => {
+    return () => {
+      updateHubstaffSeconds(trackedSecondsRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatTrackingTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -68,6 +116,7 @@ export const HubstaffView: React.FC<HubstaffViewProps> = ({ onNavigate }) => {
       showToast('Timer Hubstaff dimulai! Time tracking aktif.', 'success');
     } else {
       setIsTracking(false);
+      updateHubstaffSeconds(trackedSecondsRef.current);
       showToast('Timer Hubstaff dijeda sementara.', 'info');
     }
   };
