@@ -150,6 +150,14 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
     }
   };
 
+  // Helper format durasi Hubstaff jadi "Xj Ym" (contoh: 2j 15m)
+  const formatHubstaffDuration = (totalSeconds: number) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    if (h === 0) return `${m}m`;
+    return `${h}j ${m}m`;
+  };
+
   // Export CSV Handler
   const handleExportCSV = () => {
     if (filteredEntries.length === 0) {
@@ -168,6 +176,7 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
       'Jam Absen Siang',
       'Lokasi Siang',
       'Catatan Siang',
+      'Jam Tracking Hubstaff',
       'To-Do Selesai',
       'Total To-Do',
       'Skor To-Do (%)',
@@ -187,6 +196,7 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
       `"${e.absenSiang?.time || '-'}"`,
       `"${e.absenSiang?.location || '-'}"`,
       `"${(e.absenSiang?.notes || '').replace(/"/g, '""')}"`,
+      `"${e.hubstaffSeconds ? formatHubstaffDuration(e.hubstaffSeconds) : '-'}"`,
       e.completedTodos,
       e.totalTodos,
       `${e.employeeScorePercent}%`,
@@ -522,6 +532,7 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
                   <th className="py-3.5 px-4">Tanggal</th>
                   <th className="py-3.5 px-4">Absen Pagi</th>
                   <th className="py-3.5 px-4">Absen Siang</th>
+                  <th className="py-3.5 px-4">Jam Hubstaff</th>
                   <th className="py-3.5 px-4">Nilai Absen</th>
                   <th className="py-3.5 px-4">Capaian To-Do Centang</th>
                   <th className="py-3.5 px-4">Evaluasi Leader</th>
@@ -594,6 +605,17 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
                         </div>
                       ) : (
                         <span className="text-xs text-slate-400 italic">Belum absen siang</span>
+                      )}
+                    </td>
+
+                    {/* Jam Hubstaff */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {item.hubstaffSeconds ? (
+                        <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          {formatHubstaffDuration(item.hubstaffSeconds)}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">Belum tracking</span>
                       )}
                     </td>
 
@@ -761,6 +783,20 @@ export const RiwayatAbsenKaryawanView: React.FC = () => {
                       "{selectedEntryDetail.absenSiang.notes}"
                     </div>
                   )}
+                </div>
+
+                <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-900">Time Tracking Hubstaff:</span>
+                  </div>
+                  <div className="text-sm font-black text-indigo-900">
+                    {selectedEntryDetail.hubstaffSeconds
+                      ? formatHubstaffDuration(selectedEntryDetail.hubstaffSeconds)
+                      : 'Belum ada tracking'}
+                  </div>
+                  <div className="text-[11px] text-indigo-700">
+                    Otomatis berhenti saat Absen Siang tercatat, dan direset tiap hari baru.
+                  </div>
                 </div>
               </div>
 
