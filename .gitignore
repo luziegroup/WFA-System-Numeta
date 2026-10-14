@@ -1,0 +1,18 @@
+# Dependensi & hasil build (dibuat ulang otomatis, jangan di-upload)
+node_modules/
+dist/
+
+# Hasil compile aplikasi desktop (bisa beberapa GB)
+src-tauri/target/
+src-tauri/gen/
+
+# Rahasia / pengaturan lokal
+.env
+.env.local
+
+# Lain-lain
+*.log
+.DS_Store
+# Kunci penandatangan update desktop (RAHASIA - jangan pernah di-upload)
+*.key
+*.key.pub
