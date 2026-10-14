@@ -1,0 +1,37 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "luzie-react": {
+      ".read": true,
+      ".write": true,
+      "users": {
+        "$id": {
+          ".validate": "newData.hasChildren(['name', 'email', 'role']) && newData.child('role').isString() && (newData.child('role').val() === 'karyawan' || newData.child('role').val() === 'leader' || newData.child('role').val() === 'hrd')"
+        }
+      },
+      "entries": {
+        "$id": {
+          ".validate": "newData.hasChildren(['userId', 'date'])"
+        }
+      },
+      "urlActivity": {
+        "$date": {
+          "$uid": {
+            "visits": {
+              "$visitId": {
+                ".validate": "newData.child('token').val() === root.child('luzie-react/users').child($uid).child('urlTrackerToken').val() && newData.child('token').val() != null"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "luzie": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
