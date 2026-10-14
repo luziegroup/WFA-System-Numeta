@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "notes": "Rilis pertama WFA Numeta",
+  "pub_date": "2026-10-14T02:19:46.573Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUbW5RWnlIY3Z4czA0TnJwUEN2OFZmcG9TRDJBOXhRM21MNXVKWTRaZWpYQVVhK1RXbDNvUXRCdzlFaTdyUThia3p0R0FaamtyMXZKcndhUlFwMHRyYWJjeEhCNEh3b0F3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxOTQ0MzY5CWZpbGU6V0ZBIE51bWV0YV8xLjAuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MS4wLjAKVTYvcWpBUGwzSzFkdytTdjMwb0xLVVJwRWh1Tjhiei9LQVUvbWY2K013dlFKL0t4cEF2ekVrSHdyQk5MRjBlVW5IM3MxWmZBYmVRQnUyOFF2YUJiQ3c9PQo=",
+      "url": "https://wfa-numeta.vercel.app/updates/wfa-system_1.0.0_x64-setup.exe"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "_catatan": "Alamat database yang dipakai SEMUA aplikasi (web & desktop) saat dibuka. Untuk pindah project Firebase: ganti isi 'firebase' (dbRoot biarkan), upload file ini, selesai. Hanya berisi konfigurasi web Firebase yang memang publik.",
+  "firebase": {
+    "apiKey": "AIzaSyCp1LgPxQr5FmPW0sLKAs0My2OuT20-GGY",
+    "authDomain": "wfa-system-numeta.firebaseapp.com",
+    "databaseURL": "https://wfa-system-numeta-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "projectId": "wfa-system-numeta",
+    "storageBucket": "wfa-system-numeta.firebasestorage.app",
+    "messagingSenderId": "136549410920",
+    "appId": "1:136549410920:web:542e7782cff26bbbcef3dd"
+  },
+  "dbRoot": "luzie-react"
+}
