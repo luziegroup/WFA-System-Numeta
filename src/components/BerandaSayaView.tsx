@@ -21,6 +21,7 @@ import { SidebarMenuId } from './Sidebar';
 import { ZoomMeetingInfo } from '../types';
 import { getActiveZoomMeetingsForEmployee } from '../utils/zoomUtils';
 import { getFinalScore, weightsFromSettings } from '../utils/scoreUtils';
+import { getTodayDateString } from '../data/initialData';
 import { AbsenRequiredModal } from './AbsenRequiredModal';
 
 interface BerandaSayaViewProps {
@@ -36,9 +37,10 @@ export const BerandaSayaView: React.FC<BerandaSayaViewProps> = ({ onNavigate }) 
     null
   );
 
-  // Hitung metrik rekap Karyawan
-  const userEntries = entries.filter((e) => e.userId === currentUser.id);
-  const totalHadir = userEntries.filter((e) => e.absenPagi !== null).length || 21;
+  // Hitung metrik rekap Karyawan — HANYA bulan berjalan (bukan seluruh data yang termuat di perangkat)
+  const bulanIni = getTodayDateString().substring(0, 7); // YYYY-MM
+  const userEntries = entries.filter((e) => e.userId === currentUser.id && e.date.startsWith(bulanIni));
+  const totalHadir = userEntries.filter((e) => e.absenPagi !== null).length;
   const userWarnings = warnings.filter(
     (w) => w.recipientId === currentUser.id || w.recipientName === currentUser.name
   );
@@ -110,7 +112,7 @@ export const BerandaSayaView: React.FC<BerandaSayaViewProps> = ({ onNavigate }) 
             <div className="text-3xl font-extrabold text-white leading-tight tracking-tight">
               {totalHadir}
             </div>
-            <div className="text-xs text-sky-200/80 font-medium">Hari Hadir</div>
+            <div className="text-xs text-sky-200/80 font-medium">Hari Hadir bulan ini</div>
           </div>
 
           <div>
@@ -124,7 +126,7 @@ export const BerandaSayaView: React.FC<BerandaSayaViewProps> = ({ onNavigate }) 
             <div className="text-3xl font-extrabold text-white leading-tight tracking-tight">
               {avgSkor}
             </div>
-            <div className="text-xs text-sky-200/80 font-medium">Avg Skor</div>
+            <div className="text-xs text-sky-200/80 font-medium">Avg Skor bulan ini</div>
           </div>
         </div>
       </div>
