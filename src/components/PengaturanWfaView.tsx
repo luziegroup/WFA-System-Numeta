@@ -304,7 +304,7 @@ export const PengaturanWfaView: React.FC = () => {
               <div>
                 <span className="font-bold text-slate-800 block">Teguran Keterlambatan Otomatis</span>
                 <span className="text-[11px] text-slate-500">
-                  Kirim notifikasi peringatan jika karyawan telat absen masuk
+                  Saat karyawan absen pagi lewat batas {formData.morningAbsenTime}, kirim teguran ke karyawan itu (sekali per hari, hanya hari kerja)
                 </span>
               </div>
               <input
@@ -321,7 +321,7 @@ export const PengaturanWfaView: React.FC = () => {
               <div>
                 <span className="font-bold text-slate-800 block">Pengingat To-Do Belum Dicentang</span>
                 <span className="text-[11px] text-slate-500">
-                  Notifikasi ke karyawan jika to-do belum dicentang menjelang jam 12:00
+                  30 menit sebelum absen siang ({formData.afternoonAbsenTime}), ingatkan karyawan yang masih punya to-do belum dicentang (sekali per hari)
                 </span>
               </div>
               <input
@@ -329,6 +329,22 @@ export const PengaturanWfaView: React.FC = () => {
                 checked={formData.autoSendIncompleteTodoWarning}
                 onChange={(e) =>
                   setFormData({ ...formData, autoSendIncompleteTodoWarning: e.target.checked })
+                }
+                className="w-5 h-5 text-amber-600 rounded-md border-slate-300 focus:ring-amber-500 cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+              <div>
+                <span className="font-bold text-slate-800 block">Teguran Performa Otomatis</span>
+                <span className="text-[11px] text-slate-500">
+                  Kirim peringatan bila skor rata-rata bulan ini DI BAWAH target {formData.minKpiPassScore} (minimal 3 hari sudah dinilai leader, sekali per bulan)
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.autoSendPerformanceWarning !== false}
+                onChange={(e) =>
+                  setFormData({ ...formData, autoSendPerformanceWarning: e.target.checked })
                 }
                 className="w-5 h-5 text-amber-600 rounded-md border-slate-300 focus:ring-amber-500 cursor-pointer"
               />

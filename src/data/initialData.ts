@@ -11,6 +11,7 @@ export const INITIAL_SETTINGS: WfaSettings = {
   companyZoomPasscode: '531761',
   autoSendLateWarning: true,
   autoSendIncompleteTodoWarning: true,
+  autoSendPerformanceWarning: true,
   workDays: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
   bobotAbsen: 34,
   bobotTodo: 33,

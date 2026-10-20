@@ -3,9 +3,10 @@ import { User, DailyWfaEntry, TodoItem, AbsenRecord, WarningItem, ZoomMeetingInf
 import { INITIAL_SETTINGS, INITIAL_HUBSTAFF_SETTINGS, getTodayDateString } from '../data/initialData';
 import { useFirebaseCollection, useFirebaseValue } from '../lib/useFirebaseCollection';
 import { useEntriesStore, ALL_FROM, ALL_TO } from '../lib/useEntriesStore';
-import { watchConnection, dbRef, get, set as fbSet, remove as fbRemove, onValue, query, orderByKey, limitToLast } from '../lib/firebase';
+import { watchConnection, dbRef, get, set as fbSet, remove as fbRemove, onValue, query, orderByKey, limitToLast, cleanForFirebase } from '../lib/firebase';
 import { isInlineImage, makeImageRef, saveImage, deleteImage, safeSegment } from '../lib/imageRef';
 import { hashPassword, verifyPassword, isHashed, DEFAULT_PASSWORD } from '../lib/password';
+import { lateWarningDraft, todoReminderDraft, performanceWarningDraft, AUTO_SENDER_ID, AUTO_SENDER_NAME, type AutoWarnDraft } from '../utils/autoWarnings';
 
 interface ToastInfo {
   id: string;
@@ -371,6 +372,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  /**
+   * Kirim teguran OTOMATIS ke akun yang sedang login. Id-nya tetap (lihat utils/autoWarnings.ts) sehingga
+   * tidak pernah terkirim ganda walau aplikasi dibuka di beberapa perangkat: dicek dulu di server.
+   */
+  const autoSentRef = useRef(new Set<string>());
+  const sendAutoWarning = async (draft: AutoWarnDraft) => {
+    const key = safeSegment(draft.id);
+    if (autoSentRef.current.has(key)) return;
+    autoSentRef.current.add(key);
+    try {
+      const snap = await get(dbRef(`warnings/${key}`));
+      if (snap.exists()) return; // sudah pernah terkirim (mungkin dari perangkat lain)
+      const now = new Date();
+      const warn: WarningItem = {
+        id: key,
+        senderId: AUTO_SENDER_ID,
+        senderName: AUTO_SENDER_NAME,
+        recipientId: currentUser.id,
+        recipientName: currentUser.name,
+        type: draft.type,
+        title: draft.title,
+        message: draft.message,
+        date: draft.date,
+        createdAt: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`,
+        status: 'terkirim',
+      };
+      warningsCol.patchLocal((prev) => [warn, ...prev.filter((w) => w.id !== key)]);
+      await fbSet(dbRef(`warnings/${key}`), cleanForFirebase(warn));
+      showToast(`${draft.title}: ${draft.message}`, 'warning');
+    } catch (e) {
+      console.error('[Firebase] gagal mengirim teguran otomatis:', e);
+      autoSentRef.current.delete(key); // boleh dicoba lagi pada pengecekan berikutnya
+    }
+  };
+  const autoWarnRef = useRef(sendAutoWarning);
+  autoWarnRef.current = sendAutoWarning;
+  const wfaSettingsRef = useRef(wfaSettings);
+  wfaSettingsRef.current = wfaSettings;
+
   // Pesan jelas kalau Firebase menolak akses (biasanya karena Rules)
   const firebaseError = users.error || entriesCol.error || warningsCol.error || zoomCol.error;
   useEffect(() => {
@@ -682,6 +722,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ---------- State UI ----------
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
 
+  // ---------- Teguran otomatis (dibuat oleh aplikasi karyawan itu sendiri, lihat utils/autoWarnings.ts) ----------
+  const baselineForRef = useRef<string | null>(null);
+  baselineForRef.current = baselineFor;
+
+  // Pengingat to-do menjelang absen siang: dicek tiap menit selama aplikasi terbuka.
+  useEffect(() => {
+    if (!isAuthenticated || (currentUser.role !== 'karyawan' && currentUser.role !== 'leader')) return;
+    const tick = () => {
+      if (baselineForRef.current !== currentUser.id) return; // tunggu data awal termuat
+      const today = getTodayDateString();
+      const mine = entriesRef.current.find((e) => e.userId === currentUser.id && e.date === today);
+      if (!mine) return;
+      const draft = todoReminderDraft(currentUser.id, mine, new Date(), wfaSettingsRef.current);
+      if (draft) void autoWarnRef.current(draft);
+    };
+    tick();
+    const id = setInterval(tick, 60000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser.id, currentUser.role]);
+
+  // Teguran performa: dievaluasi tiap data entry diperbarui (login, Refresh, setelah leader menilai).
+  useEffect(() => {
+    if (!isAuthenticated || currentUser.role !== 'karyawan' || baselineFor !== currentUser.id) return;
+    const draft = performanceWarningDraft(currentUser.id, entriesRef.current, getTodayDateString(), wfaSettingsRef.current);
+    if (draft) void autoWarnRef.current(draft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesCol.updatedAt, baselineFor, isAuthenticated, currentUser.id, currentUser.role]);
+
   // Pindah ke tanggal lain (mis. menengok hari sebelumnya): pastikan entry milik sendiri di tanggal itu termuat
   useEffect(() => {
     if (!isAuthenticated || baselineFor !== currentUser.id) return;
@@ -894,6 +963,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     trackSave(ackPagi, 'Absen pagi', `entry-${currentUser.id}-${selectedDate}`);
+    if (currentUser.role !== 'hrd') {
+      const lateDraft = lateWarningDraft(currentUser.id, selectedDate, record, wfaSettings);
+      if (lateDraft) void sendAutoWarning(lateDraft);
+    }
     showToast(`Absen Pagi berhasil (${record.status === 'terlambat' ? 'Terlambat' : 'Tepat Waktu'})`, 'success');
   };
 

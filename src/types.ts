@@ -34,6 +34,8 @@ export interface WfaSettings {
   companyZoomPasscode: string;
   autoSendLateWarning: boolean;
   autoSendIncompleteTodoWarning: boolean;
+  /** Kirim teguran performa otomatis bila rata-rata skor bulan berjalan di bawah minKpiPassScore. */
+  autoSendPerformanceWarning: boolean;
   workDays: string[];
   // Bobot Penilaian Performa (%) - dipakai untuk hitung Skor Akhir gabungan
   bobotAbsen: number; // default 34
