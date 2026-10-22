@@ -751,6 +751,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entriesCol.updatedAt, baselineFor, isAuthenticated, currentUser.id, currentUser.role]);
 
+  // Sinkron dua arah web <-> desktop: dengarkan HANYA entry milik sendiri pada tanggal terpilih (beberapa KB).
+  // Absen/to-do/penilaian yang terjadi di perangkat lain langsung tampil di sini, dan sebaliknya.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const id = `entry-${currentUser.id}-${selectedDate}`;
+    return onValue(
+      dbRef(`entries/${safeSegment(id)}`),
+      (snap) => entriesCol.applyRemote(id, snap.val()),
+      (err) => console.error('[Firebase] gagal mendengarkan entry sendiri:', err)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser.id, selectedDate]);
+
   // Pindah ke tanggal lain (mis. menengok hari sebelumnya): pastikan entry milik sendiri di tanggal itu termuat
   useEffect(() => {
     if (!isAuthenticated || baselineFor !== currentUser.id) return;
@@ -907,7 +920,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // 1. Absen Pagi Karyawan
+  /**
+   * Absen pagi: SEBELUM menulis, cek server — kalau perangkat lain (web/desktop) sudah mencatat absen hari ini,
+   * tampilan diperbarui dan absen TIDAK ditimpa.
+   */
   const doAbsenPagi = (location: string, notes: string) => {
+    void (async () => {
+      const id = `entry-${currentUser.id}-${selectedDate}`;
+      try {
+        const snap = await get(dbRef(`entries/${safeSegment(id)}/absenPagi`));
+        const remote = snap.val() as { time?: string } | null;
+        if (remote) {
+          entriesCol.refreshOne(id).catch(() => undefined);
+          showToast(`Anda sudah absen pagi pukul ${remote.time || ''} (tercatat dari perangkat lain). Tampilan diperbarui.`, 'info');
+          return;
+        }
+      } catch {
+        /* offline: lanjut dengan data lokal, pengaman lokal tetap berlaku */
+      }
+      doAbsenPagiNow(location, notes);
+    })();
+  };
+
+  const doAbsenPagiNow = (location: string, notes: string) => {
     // Pengaman: absen yang sudah tercatat TIDAK boleh ditimpa (jam & status aslinya hilang kalau absen lagi)
     const already = entriesRef.current.find((e) => e.userId === currentUser.id && e.date === selectedDate)?.absenPagi;
     if (already) {
@@ -1120,6 +1155,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 6. Absen Siang Karyawan (dilakukan setelah mencentang to-do)
   const doAbsenSiang = (location: string, notes: string) => {
+    void (async () => {
+      const id = `entry-${currentUser.id}-${selectedDate}`;
+      try {
+        const snap = await get(dbRef(`entries/${safeSegment(id)}/absenSiang`));
+        const remote = snap.val() as { time?: string } | null;
+        if (remote) {
+          entriesCol.refreshOne(id).catch(() => undefined);
+          showToast(`Anda sudah absen siang pukul ${remote.time || ''} (tercatat dari perangkat lain). Tampilan diperbarui.`, 'info');
+          return;
+        }
+      } catch {
+        /* offline: lanjut dengan data lokal */
+      }
+      doAbsenSiangNow(location, notes);
+    })();
+  };
+
+  const doAbsenSiangNow = (location: string, notes: string) => {
     const alreadyS = entriesRef.current.find((e) => e.userId === currentUser.id && e.date === selectedDate)?.absenSiang;
     if (alreadyS) {
       showToast(`Anda sudah absen siang pukul ${alreadyS.time}. Absen tidak perlu diulang.`, 'info');

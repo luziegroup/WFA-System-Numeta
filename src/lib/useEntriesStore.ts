@@ -166,6 +166,20 @@ export function useEntriesStore<T extends E>({ normalize, sort, onWriteError }: 
     return update(dbRef(`entries/${id}`), body);
   }, []);
 
+  /**
+   * Terapkan kondisi TERBARU satu entry dari server ke state lokal TANPA menulis balik ke Firebase.
+   * Dipakai pendengar ringan di entry milik sendiri, supaya absen/to-do dari perangkat lain (web <-> desktop)
+   * langsung tampil di perangkat ini. raw = null berarti entry itu tidak ada di server.
+   */
+  const applyRemote = useCallback((id: string, raw: unknown) => {
+    const others = itemsRef.current.filter((e) => e.id !== id);
+    if (!raw || typeof raw !== 'object') {
+      if (others.length !== itemsRef.current.length) commit(others);
+      return;
+    }
+    commit(others.concat(normalizeRef.current({ ...(raw as object), id }, id)));
+  }, []);
+
   /** Kosongkan semua (saat ganti akun) supaya data akun sebelumnya tidak tertinggal di memori. */
   const reset = useCallback(() => {
     coverage.current.clear();
@@ -175,5 +189,5 @@ export function useEntriesStore<T extends E>({ normalize, sort, onWriteError }: 
     setUpdatedAt(null);
   }, []);
 
-  return { items, setItems, setItemsAck, rewriteEntry, ensure, refreshOne, reset, loading: pending > 0, updatedAt, error };
+  return { items, setItems, setItemsAck, rewriteEntry, applyRemote, ensure, refreshOne, reset, loading: pending > 0, updatedAt, error };
 }
