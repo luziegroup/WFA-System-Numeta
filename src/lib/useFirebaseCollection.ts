@@ -82,6 +82,9 @@ export function diffCollection<T extends { id: string }>(
   return changes;
 }
 
+/** Batas ukuran satu cache di localStorage (karakter). Lebih besar dari ini tidak disimpan. */
+const MAX_CACHE_CHARS = 400_000;
+
 function readCache<T>(key: string): T[] {
   try {
     const raw = localStorage.getItem(key);
@@ -126,7 +129,10 @@ export function useFirebaseCollection<T extends { id: string }>({
       setError(null);
       setUpdatedAt(Date.now());
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(list));
+        const raw = JSON.stringify(list);
+        // Cache hanya untuk mempercepat tampilan awal: jangan boros ruang localStorage (batas ~5 MB)
+        if (raw.length <= MAX_CACHE_CHARS) localStorage.setItem(cacheKey, raw);
+        else localStorage.removeItem(cacheKey);
       } catch {
         /* kuota penuh — cache saja, tidak fatal */
       }
@@ -235,7 +241,9 @@ export function useFirebaseValue<T extends object>(path: string, defaults: T) {
         setExists(raw !== null);
         setLoaded(true);
         try {
-          localStorage.setItem(cacheKey, JSON.stringify(merged));
+          const raw2 = JSON.stringify(merged);
+          if (raw2.length <= MAX_CACHE_CHARS) localStorage.setItem(cacheKey, raw2);
+          else localStorage.removeItem(cacheKey);
         } catch {
           /* abaikan */
         }
