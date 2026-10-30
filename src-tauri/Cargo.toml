@@ -1,6 +1,6 @@
 [package]
 name = "wfa-system"
-version = "1.0.0"
+version = "1.0.1"
 description = "WFA System - Luzie Group: aplikasi desktop (absensi, to-do, zoom, performa, dan time tracking)"
 edition = "2021"
 

@@ -29,22 +29,22 @@ const env = import.meta.env;
 
 const BUILT_IN: Omit<RuntimeConfig, 'source'> = {
   firebase: {
-    apiKey: env.VITE_FIREBASE_API_KEY || 'AIzaSyCp1LgPxQr5FmPW0sLKAs0My2OuT20-GGY',
-    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'wfa-system-numeta.firebaseapp.com',
-    databaseURL: env.VITE_FIREBASE_DATABASE_URL || 'https://wfa-system-numeta-default-rtdb.asia-southeast1.firebasedatabase.app',
-    projectId: env.VITE_FIREBASE_PROJECT_ID || 'wfa-system-numeta',
-    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'wfa-system-numeta.firebasestorage.app',
-    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '136549410920',
-    appId: env.VITE_FIREBASE_APP_ID || '1:136549410920:web:542e7782cff26bbbcef3dd',
+    apiKey: env.VITE_FIREBASE_API_KEY || 'AIzaSyAWhSFKuVOvjOWr8YiSi590B8klIooZcqU',
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'wfa-system-numeta-2.firebaseapp.com',
+    databaseURL: env.VITE_FIREBASE_DATABASE_URL || 'https://wfa-system-numeta-2-default-rtdb.europe-west1.firebasedatabase.app',
+    projectId: env.VITE_FIREBASE_PROJECT_ID || 'wfa-system-numeta-2',
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'wfa-system-numeta-2.firebasestorage.app',
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '754014319481',
+    appId: env.VITE_FIREBASE_APP_ID || '1:754014319481:web:615a7279c2e5f4255a75a8',
   },
   dbRoot: env.VITE_DB_ROOT || 'luzie-react',
 };
 
 /** Alamat config.json untuk aplikasi desktop (di desktop tidak ada "hosting sendiri"). */
-const DESKTOP_CONFIG_URL = env.VITE_REMOTE_CONFIG_URL || 'https://wfa-numeta.vercel.app/config.json';
+const DESKTOP_CONFIG_URL = env.VITE_REMOTE_CONFIG_URL || 'https://wfa-system-numeta.vercel.app/config.json';
 
 const CACHE_KEY = 'wfa_runtime_config_v1';
-const FETCH_TIMEOUT_MS = 2500;
+const FETCH_TIMEOUT_MS = 8000;
 
 const clean = (s: string) => s.replace(/^\/+|\/+$/g, '');
 
