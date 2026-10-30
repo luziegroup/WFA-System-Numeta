@@ -30,7 +30,7 @@ import { useScreenshotCapture } from '../lib/useScreenshotCapture';
 
 /** Link download installer aplikasi desktop WFA System (mis. link Google Drive).
  *  Tempel link di antara tanda kutip. Selama masih kosong, tidak ada yang berubah di tampilan. */
-const DESKTOP_DOWNLOAD_URL = 'https://drive.google.com/file/d/1uGV-XjIDR9HOcfodk--q5M2Bocj-6H4X/view?usp=sharing';
+const DESKTOP_DOWNLOAD_URL = 'https://drive.google.com/file/d/1CT14PkXQpyhX36-xUIJFgO0iZDMBH7i7/view?usp=sharing';
 
 /** false = tracking tetap bisa dimulai dari browser seperti biasa (hanya muncul anjuran
  *  install aplikasi desktop). Ubah jadi true kalau installer sudah dibagikan ke karyawan
