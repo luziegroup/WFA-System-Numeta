@@ -1,0 +1,6 @@
+{
+  "name": "WFA System - Numeta",
+  "description": "Sistem WFA Numeta dengan Dashboard Tim, Zoom Pagi, Monitor To-Do List Centang & Bukti, Rekap Absensi, Performa Tim, dan Kirim Teguran.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

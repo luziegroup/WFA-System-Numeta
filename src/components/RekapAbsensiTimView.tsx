@@ -3,7 +3,7 @@ import { HubstaffCell } from './HubstaffCell';
 import { formatDuration, getActivityPercent } from '../utils/hubstaffUtils';
 import { RefreshBar } from './RefreshBar';
 import { useApp, useEntriesRange } from '../context/AppContext';
-import { presetRange } from '../utils/dateRange';
+import { presetRange, formatDateIndo } from '../utils/dateRange';
 import { DailyWfaEntry } from '../types';
 import { getFinalScore, getAbsenScore, weightsFromSettings } from '../utils/scoreUtils';
 import {
@@ -312,7 +312,7 @@ export const RekapAbsensiTimView: React.FC = () => {
               Pemantauan Kehadiran Tim
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Status absen seluruh anggota tim pada tanggal <span className="font-semibold text-slate-700">{selectedDate}</span> — termasuk yang belum absen sama sekali hari ini.
+              Status absen seluruh anggota tim pada tanggal <span className="font-semibold text-slate-700">{formatDateIndo(selectedDate)}</span> — termasuk yang belum absen sama sekali hari ini.
             </p>
           </div>
           <div className="flex items-center gap-2 text-[11px] shrink-0">
@@ -543,7 +543,7 @@ export const RekapAbsensiTimView: React.FC = () => {
                   <tr key={e.id} className="hover:bg-slate-50/70 transition-colors">
                     {/* Tanggal */}
                     <td className="py-3.5 px-4 font-mono font-medium text-slate-600 whitespace-nowrap">
-                      {e.date}
+                      {formatDateIndo(e.date)}
                     </td>
 
                     {/* Karyawan */}
@@ -721,7 +721,7 @@ export const RekapAbsensiTimView: React.FC = () => {
                   Rincian Absensi: {selectedDetailEntry.userName}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {selectedDetailEntry.division} &bull; Tanggal: {selectedDetailEntry.date}
+                  {selectedDetailEntry.division} &bull; Tanggal: {formatDateIndo(selectedDetailEntry.date)}
                 </p>
               </div>
               <button

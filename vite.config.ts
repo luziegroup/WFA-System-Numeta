@@ -34,6 +34,7 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     strictPort: true,
+    allowedHosts: true,
     watch: {
       // Isi folder ini hasil compile Rust; kalau ikut dipantau Vite, muncul error EBUSY.
       ignored: ['**/src-tauri/**'],

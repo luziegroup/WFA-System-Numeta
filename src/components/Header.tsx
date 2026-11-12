@@ -15,6 +15,8 @@ import {
   LogOut
 } from 'lucide-react';
 
+import { formatDateIndo } from '../utils/dateRange';
+
 interface HeaderProps {
   onToggleSidebar?: () => void;
   activeRoleTab?: 'karyawan' | 'leader' | 'hrd';
@@ -28,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { currentUser, logout, isOnline } = useApp();
   const [timeStr, setTimeStr] = useState<string>('');
+  const [dateStr, setDateStr] = useState<string>('');
 
   useEffect(() => {
     const updateTime = () => {
@@ -36,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const seconds = String(now.getSeconds()).padStart(2, '0');
       setTimeStr(`${hours}:${minutes}:${seconds}`);
+      setDateStr(formatDateIndo(now));
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
@@ -85,9 +89,12 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Middle & Right: Clock, Online Badge, User & Keluar */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Clock */}
-              <div className="text-xs font-mono font-bold text-sky-100 hidden sm:block">
-                {timeStr}
+              {/* Date & Clock */}
+              <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-sky-100 bg-white/10 px-3 py-1.5 rounded-xl border border-white/15">
+                <Calendar className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+                <span>{dateStr}</span>
+                <span className="text-sky-300/60">&bull;</span>
+                <span className="font-mono font-bold text-white">{timeStr}</span>
               </div>
 
               {/* Status koneksi Firebase */}

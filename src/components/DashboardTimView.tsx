@@ -17,6 +17,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { SidebarMenuId } from './Sidebar';
+import { formatDateIndo } from '../utils/dateRange';
 import {
   ResponsiveContainer,
   BarChart,
@@ -78,6 +79,24 @@ export const DashboardTimView: React.FC<DashboardTimViewProps> = ({ onNavigate }
           <p className="text-xs text-sky-100/90 mt-1 max-w-xl">
             Ringkasan status absensi pagi/siang, persentase penyelesaian to-do list centang, dan progres penilaian evaluasi harian.
           </p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/20 border border-white/25 text-xs font-semibold text-white shadow-xs cursor-pointer transition-colors" title="Klik untuk pilih tanggal">
+              <Calendar className="w-4 h-4 text-sky-300 shrink-0 pointer-events-none" />
+              <span className="pointer-events-none">{formatDateIndo(selectedDate)}</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker?.();
+                  } catch {}
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                title="Pilih tanggal"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -190,7 +209,8 @@ export const DashboardTimView: React.FC<DashboardTimViewProps> = ({ onNavigate }
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-blue-600" />
-              <span>Grafik Performa Tim Hari Ini</span>
+              <span>Grafik Performa Tim</span>
+              <span className="text-xs font-semibold text-slate-500">({formatDateIndo(selectedDate)})</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Perbandingan capaian to-do list centang mandiri (%) dan evaluasi leader per anggota tim
@@ -243,7 +263,10 @@ export const DashboardTimView: React.FC<DashboardTimViewProps> = ({ onNavigate }
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Kehadiran & Status To-Do Tim</h2>
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>Kehadiran &amp; Status To-Do Tim</span>
+              <span className="text-xs font-semibold text-slate-500">({formatDateIndo(selectedDate)})</span>
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Daftar anggota tim beserta status jam absen pagi, siang, dan skor to-do centang
             </p>

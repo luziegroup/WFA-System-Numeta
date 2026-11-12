@@ -3,6 +3,7 @@ import { RefreshBar } from './RefreshBar';
 import { useApp, useEntriesRange } from '../context/AppContext';
 import { DailyWfaEntry, TodoItem } from '../types';
 import { getAbsenScore } from '../utils/scoreUtils';
+import { formatDateIndo } from '../utils/dateRange';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -450,7 +451,7 @@ export const LeaderView: React.FC = () => {
                   <h3 className="font-bold text-slate-900 text-base">
                     Penilaian &amp; Evaluasi Leader: {activeEntryForReview.userName}
                   </h3>
-                  <p className="text-xs text-slate-500">{activeEntryForReview.division} &bull; Tanggal: {selectedDate}</p>
+                  <p className="text-xs text-slate-500">{activeEntryForReview.division} &bull; Tanggal: {formatDateIndo(selectedDate)}</p>
                 </div>
               </div>
               <button

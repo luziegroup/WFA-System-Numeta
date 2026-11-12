@@ -15,13 +15,15 @@ import {
   ChevronRight,
   ShieldAlert,
   Award,
-  Bell
+  Bell,
+  Calendar
 } from 'lucide-react';
 import { SidebarMenuId } from './Sidebar';
 import { ZoomMeetingInfo } from '../types';
 import { getActiveZoomMeetingsForEmployee } from '../utils/zoomUtils';
 import { getFinalScore, weightsFromSettings } from '../utils/scoreUtils';
 import { getTodayDateString } from '../data/initialData';
+import { formatDateIndo } from '../utils/dateRange';
 import { AbsenRequiredModal } from './AbsenRequiredModal';
 
 interface BerandaSayaViewProps {
@@ -93,17 +95,23 @@ export const BerandaSayaView: React.FC<BerandaSayaViewProps> = ({ onNavigate }) 
       <RefreshBar onRefresh={refreshAll} loading={entriesLoading || warningsLoading || zoomLoading} updatedAt={lastSyncAt} />
       {/* 1. Header Banner Profil Karyawan (Sesuai Persis Gambar 1) */}
       <div className="bg-[#004080] rounded-2xl p-6 text-white shadow-sm space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2 tracking-tight">
-            <span>Selamat pagi, {currentUser.name.split(' ')[0]}!</span>
-            <span>👋</span>
-          </h1>
-          <p className="text-xs text-sky-200/90 mt-1 font-medium">
-            Karyawan &bull; {currentUser.division} &bull; Koordinator:{' '}
-            <span className="font-semibold text-white">
-              {currentUser.leaderName || 'Adhitya Novebi Rahmawan'}
-            </span>
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2 tracking-tight">
+              <span>Selamat pagi, {currentUser.name.split(' ')[0]}!</span>
+              <span>👋</span>
+            </h1>
+            <p className="text-xs text-sky-200/90 mt-1 font-medium">
+              Karyawan &bull; {currentUser.division} &bull; Koordinator:{' '}
+              <span className="font-semibold text-white">
+                {currentUser.leaderName || 'Adhitya Novebi Rahmawan'}
+              </span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 bg-white/10 border border-white/20 px-3.5 py-2 rounded-xl text-xs font-semibold text-white w-fit shadow-xs shrink-0">
+            <Calendar className="w-4 h-4 text-sky-300" />
+            <span>{formatDateIndo(entry.date || getTodayDateString())}</span>
+          </div>
         </div>
 
         {/* 3 Angka Metrik: Hari Hadir, Pelanggaran, Avg Skor */}
@@ -342,7 +350,7 @@ export const BerandaSayaView: React.FC<BerandaSayaViewProps> = ({ onNavigate }) 
                 <div>
                   <div className="font-bold text-slate-900 text-sm">{meeting.title}</div>
                   <div className="text-slate-500 mt-0.5">
-                    Waktu: {meeting.date} &bull; {meeting.time} WIB &bull; Passcode: {meeting.passcode}
+                    Waktu: {formatDateIndo(meeting.date)} &bull; {meeting.time} WIB &bull; Passcode: {meeting.passcode}
                   </div>
                   {meeting.agenda && (
                     <div className="text-slate-600 mt-1">Agenda: {meeting.agenda}</div>

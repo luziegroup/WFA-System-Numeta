@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { RefreshBar } from './RefreshBar';
 import { useApp, useEntriesRange } from '../context/AppContext';
 import { DailyWfaEntry, TodoItem } from '../types';
+import { formatDateIndo } from '../utils/dateRange';
 import {
   Briefcase,
   Users,
@@ -133,13 +134,20 @@ export const HrdView: React.FC<HrdViewProps> = ({ onNavigate }) => {
 
         {/* Date Selector & Export */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" />
+          <div className="relative flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl text-xs hover:bg-slate-100 transition-colors shadow-xs cursor-pointer" title="Klik untuk pilih tanggal">
+            <Calendar className="w-4 h-4 text-sky-600 shrink-0 pointer-events-none" />
+            <span className="font-bold text-slate-800 pointer-events-none">{formatDateIndo(selectedDate)}</span>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 text-xs border-none focus:outline-none cursor-pointer"
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              title="Klik untuk memilih tanggal"
             />
           </div>
           <button
@@ -403,7 +411,7 @@ export const HrdView: React.FC<HrdViewProps> = ({ onNavigate }) => {
                   Rincian To-Do List: {selectedDetailEntry.userName}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {selectedDetailEntry.division} &bull; Tanggal: {selectedDetailEntry.date}
+                  {selectedDetailEntry.division} &bull; Tanggal: {formatDateIndo(selectedDetailEntry.date)}
                 </p>
               </div>
               <button
